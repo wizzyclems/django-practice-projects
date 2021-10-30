@@ -25,10 +25,13 @@ class Listing(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='user')
     categories = models.ManyToManyField(Category, related_name='listings')
 
+    
+
     def __str__(self) -> str:
-        cat = [ c.title for c in self.categories.all() ]
-        c = ",".join(cat)
-        return f"{self.title}[{ c }] -> Starting Bid: ${self.startBid}"
+        #cat = [ c.title for c in self.categories.all() ]
+        #c = ",".join(cat)
+        #return f"{self.title}[{ c }] -> Starting Bid: ${self.startBid}"
+        return f"{self.title} -> Starting Bid: ${self.startBid}"
 
 
 class Bid(models.Model):
