@@ -24,6 +24,7 @@ class Listing(models.Model):
     photo = models.ImageField(upload_to='auctions/photos')
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='user')
     categories = models.ManyToManyField(Category, related_name='listings')
+    closed = models.BooleanField(default=False)
 
     
 
@@ -31,21 +32,35 @@ class Listing(models.Model):
         #cat = [ c.title for c in self.categories.all() ]
         #c = ",".join(cat)
         #return f"{self.title}[{ c }] -> Starting Bid: ${self.startBid}"
-        return f"{self.title} -> Starting Bid: ${self.startBid}"
+        return f"{self.id}:{self.title} -> Starting Bid: ${self.startBid}"
 
 
 class Bid(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bidder')
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='listing')
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='biddings')
     bid = models.BigIntegerField()
+    highest = models.BooleanField(default=False)
 
     def __str__(self) -> str:
-        return f"{self.listing.title}({self.user}) : ${self.bid}"
+        return f"{self.user}: ${self.bid}({self.highest})"
 
 
     
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='commenter')
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='list_item')
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='comments')
     text = models.CharField(max_length=255)
+
+    def __str__(self) -> str:
+        return f"{self.user}: {self.text}"
+
+
+class WatchList(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='watcher')
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='watches')
+    
+    def __str__(self) -> str:
+        return f"{self.listing}"
+
+
 

@@ -4,8 +4,8 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 
-from .models import Category, Listing, User
-from .forms import AddListingForm
+from .models import Category, Listing, User,Bid,Comment
+from .forms import AddListingForm, BidForm, CommentForm
 
 
 def index(request):
@@ -140,3 +140,143 @@ def addListing(request):
         
     
     return HttpResponseRedirect(reverse("index"))
+
+
+
+def listing_detail(request,list_id):
+    print(f"Search for a listing details with id {list_id}")
+
+    try:
+        listing = Listing.objects.get(id=list_id)
+    except Listing.DoesNotExist:
+        listing = None
+
+    commentForm = CommentForm()
+    bidForm = BidForm()
+
+    if listing :
+        commentForm.initial['list_id'] = listing.id
+        bidForm.initial['list_id'] = listing.id
+
+    print(f"The search listing is : {listing} ")
+    return render(request, "auctions/listing_view.html", {
+        "listing": listing,
+        "bidForm": bidForm,
+        "commentForm": commentForm
+    })
+
+
+def place_bid(request):
+
+    if request.method == 'POST':
+        message = ""
+        bidForm = BidForm(request.POST)
+        commentForm = CommentForm()
+
+        list_id = request.POST["list_id"]
+        listing = Listing.objects.get(id=list_id)
+
+        if bidForm.is_valid():
+            print(f"***The bid form is valid.")
+            bid = request.POST["bid"]
+            
+            user = request.user
+            bid = Bid(bid=bid,listing=listing,user=user)
+
+            try:
+                bid.save()
+                print(f"Bid: <{bid}> has been saved successfully")
+                message = "Your Bid has been successfully saved."
+                bidForm = BidForm()
+            except Exception:
+                print(f"An error occurred while saving your bid. Kindly try again. -> {bid}")
+                message = "An error occurred while saving your bid. Kindly try again."
+            finally:
+                bidForm.initial['list_id'] = listing.id # I don't think we need this line though since the id may still be in the returned request
+        else:
+            print(f"**************The bid form is not valid")
+    
+        commentForm.initial['list_id'] = listing.id
+
+        return render(request, "auctions/listing_view.html",{
+            "listing": listing,
+            "bidForm": bidForm,
+            "commentForm": commentForm,
+            "message": message
+        })
+    else:
+        return HttpResponseRedirect(reverse("index"))
+
+
+def add_comment(request):
+    
+    if request.method == 'POST':
+        message = ""
+        commentForm = CommentForm(request.POST)
+        bidForm = BidForm()
+
+        list_id = request.POST["list_id"]
+        listing = Listing.objects.get(id=list_id)
+
+        if commentForm.is_valid():
+            print(f"***The comment form is valid.")
+            text = request.POST["text"]
+            
+            user = request.user
+            comment = Comment(text=text,listing=listing,user=user)
+
+            try:
+                comment.save()
+                print(f"Comment: <{comment}> has been saved successfully")
+                message = "Your Comment has been successfully saved."
+                commentForm = CommentForm()
+            except Exception:
+                print(f"An error occurred while saving your comment. Kindly try again. -> {comment}")
+                message = "An error occurred while saving your comment. Kindly try again."
+            finally:
+                commentForm.initial['list_id'] = listing.id # I don't think we need this line though since the id may still be in the returned request
+        else:
+            print(f"**************The comment form is not valid")
+    
+        bidForm.initial['list_id'] = listing.id
+
+        return render(request, "auctions/listing_view.html",{
+            "listing": listing,
+            "bidForm": bidForm,
+            "commentForm": commentForm,
+            "message": message
+        })
+    else:
+        return HttpResponseRedirect(reverse("index"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
