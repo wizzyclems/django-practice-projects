@@ -21,7 +21,7 @@ class Listing(models.Model):
     title = models.CharField(max_length=64)
     description = models.CharField(max_length=255)
     startBid = models.BigIntegerField()
-    photo = models.ImageField(upload_to='static/auction_photos')
+    photo = models.ImageField(upload_to='auctions/photos')
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='user')
     categories = models.ManyToManyField(Category, related_name='listings')
 

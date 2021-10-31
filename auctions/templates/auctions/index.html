@@ -4,10 +4,11 @@
     <h2>Active Listings</h2>
 
     <br />
+    
     {% for list in listing %}
         <div>
             <div>
-                <img width="60" height="60" src="/{{ list.photo }}" alt="{{ list.title }}"  />
+                <img width="60" height="60" src="{{ list.photo.url }}" alt="{{ list.title }}"  />
             </div>
             <div>
                 <h5>{{ list.title }}</h5>
