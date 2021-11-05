@@ -1,0 +1,27 @@
+{% extends "auctions/layout.html" %}
+
+{% block body %}
+    <h2>Your Watch List</h2>
+
+    <br />
+    
+    {% for watch in watchlist %}
+        <div>
+            <div>
+                <img width="60" height="60" src="{{ watch.listing.photo.url }}" alt="{{ list.title }}"  />
+            </div>
+            <div>
+                <h5>{{ watch.listing.title }}</h5>
+                <b>Price: </b>{{ watch.listing.startBid }}<br/>
+                </b><i>{{ watch.listing.description }}</i><br/>
+                <b>Listed By: </b>{{ watch.listing.user }}
+                <br />
+                <hr />
+                <br />
+            </div>
+        </div>
+        {% empty %}
+            <div><h4>You are currently not watching any Listing.</h4></div>
+    {% endfor %}
+
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "auctions/layout.html" %}
+
+{% block body %}
+    <h2>Available Categories</h2>
+
+    <br />
+    
+    {% for category in categories %}
+        <div>
+            <div>
+                <a href="{% url 'category_details' category.id %}" >{{ category }}</a>
+            </div>
+            <br />
+        </div>
+        {% empty %}
+            <div><h4>You are currently not watching any Listing.</h4></div>
+    {% endfor %}
+
+{% endblock %}

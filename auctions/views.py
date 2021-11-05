@@ -1,10 +1,11 @@
 from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
 
-from .models import Category, Listing, User,Bid,Comment
+from .models import Category, Listing, User,Bid,Comment, WatchList
 from .forms import AddListingForm, BidForm, CommentForm
 
 
@@ -22,18 +23,31 @@ def login_view(request):
         # Attempt to sign user in
         username = request.POST["username"]
         password = request.POST["password"]
+        forward_to = request.POST["redirect"]
         user = authenticate(request, username=username, password=password)
 
         # Check if authentication successful
         if user is not None:
             login(request, user)
+            
+            if forward_to != 'None':
+                return redirect(forward_to)
+                #return HttpResponseRedirect(reverse(redirect))
+
             return HttpResponseRedirect(reverse("index"))
         else:
             return render(request, "auctions/login.html", {
                 "message": "Invalid username and/or password."
             })
     else:
-        return render(request, "auctions/login.html")
+        try:
+            next = request.GET['next']
+        except Exception:
+            next = None
+
+        return render(request, "auctions/login.html",{
+            "redirect": next
+        })
 
 
 def logout_view(request):
@@ -142,8 +156,30 @@ def addListing(request):
     return HttpResponseRedirect(reverse("index"))
 
 
+def loadListingView(request, listing, bidForm, commentForm, message):
+
+    if request.user and listing :
+        watchList = WatchList.objects.filter(user=request.user,listing=listing)
+        if watchList:
+            isWatching = True
+        else:
+            isWatching = False
+
+        commentForm.initial['list_id'] = listing.id
+        bidForm.initial['list_id'] = listing.id
+
+    return render(request, "auctions/listing_view.html",{
+        "listing": listing,
+        "bidForm": bidForm,
+        "commentForm": commentForm,
+        "message": message,
+        "watching": isWatching
+    })
+    
 
 def listing_detail(request,list_id):
+    message = ""
+
     print(f"Search for a listing details with id {list_id}")
 
     try:
@@ -154,16 +190,7 @@ def listing_detail(request,list_id):
     commentForm = CommentForm()
     bidForm = BidForm()
 
-    if listing :
-        commentForm.initial['list_id'] = listing.id
-        bidForm.initial['list_id'] = listing.id
-
-    print(f"The search listing is : {listing} ")
-    return render(request, "auctions/listing_view.html", {
-        "listing": listing,
-        "bidForm": bidForm,
-        "commentForm": commentForm
-    })
+    return loadListingView(request, listing, bidForm, commentForm, message)
 
 
 def place_bid(request):
@@ -191,25 +218,16 @@ def place_bid(request):
             except Exception:
                 print(f"An error occurred while saving your bid. Kindly try again. -> {bid}")
                 message = "An error occurred while saving your bid. Kindly try again."
-            finally:
-                bidForm.initial['list_id'] = listing.id # I don't think we need this line though since the id may still be in the returned request
         else:
             print(f"**************The bid form is not valid")
-    
-        commentForm.initial['list_id'] = listing.id
 
-        return render(request, "auctions/listing_view.html",{
-            "listing": listing,
-            "bidForm": bidForm,
-            "commentForm": commentForm,
-            "message": message
-        })
+        return loadListingView(request, listing, bidForm, commentForm, message)
     else:
         return HttpResponseRedirect(reverse("index"))
 
 
 def add_comment(request):
-    
+
     if request.method == 'POST':
         message = ""
         commentForm = CommentForm(request.POST)
@@ -233,26 +251,107 @@ def add_comment(request):
             except Exception:
                 print(f"An error occurred while saving your comment. Kindly try again. -> {comment}")
                 message = "An error occurred while saving your comment. Kindly try again."
-            finally:
-                commentForm.initial['list_id'] = listing.id # I don't think we need this line though since the id may still be in the returned request
         else:
             print(f"**************The comment form is not valid")
     
-        bidForm.initial['list_id'] = listing.id
-
-        return render(request, "auctions/listing_view.html",{
-            "listing": listing,
-            "bidForm": bidForm,
-            "commentForm": commentForm,
-            "message": message
-        })
+        return loadListingView(request, listing, bidForm, commentForm, message)
     else:
         return HttpResponseRedirect(reverse("index"))
 
 
+@login_required(login_url="login")
+def watch_item(request, list_id):
+    
+    print(f"User attempting to watch auction item : {list_id}")
+
+    try:
+        listing = Listing.objects.get(id=list_id)
+    except Listing.DoesNotExist:
+        listing = None
+
+    if listing :
+        watching = listing.watches.filter(user=request.user)
+        print(f"the user is currently {watching}" )
+        if( not watching ):
+            watch = WatchList(user=request.user, listing=listing)
+            watch.save()
+            print("Auction item added to user watch list successfully.")
+            list_detail_message = "Auction item added to user watch list successfully."
+        else:
+            print("User is already watching this item")
+    else:
+        print(f"No Auction item found with the provided list Id {list_id}" )
+
+    return listing_detail(request,list_id)
 
 
+@login_required(login_url="login")
+def unwatch_item(request,list_id):
+    print(f"User attempting to unwatch auction item : {list_id}")
 
+    try:
+        listing = Listing.objects.get(id=list_id)
+    except Listing.DoesNotExist:
+        listing = None
+
+    if listing :
+        try:
+            watchItem = listing.watches.get(user=request.user)
+        except WatchList.DoesNotExist:
+            watchItem = None
+
+        print(watchItem)
+        if watchItem :
+            watchItem.delete()
+            print("Auction item removed from user's watch list successfully.")
+            list_detail_message = "Auction item removed from user's watch list successfully."
+        else:
+            print("User is not watching item. Nothing to remove.")
+    else:
+        print(f"No Auction item found with the provided list Id {list_id}" )
+
+
+    return listing_detail(request,list_id)
+
+
+@login_required(login_url="login")
+def watchlist(request):
+    print("Loading the watchlist for the logged in user.")
+
+    watchList = WatchList.objects.filter(user=request.user)
+
+    return render(request, "auctions/watchlist.html", {
+        "watchlist": watchList
+    })
+
+
+def categories(request):
+    print("Loading the available categories.")
+
+    categories = Category.objects.all()
+
+    return render(request, "auctions/categories.html", {
+        "categories": categories
+    })
+
+
+def category_details(request, cat_id):
+    message = ""
+
+    print(f"Loading items for the category: {cat_id}")
+
+    try:
+        category = Category.objects.get(id=cat_id)
+        print(f"the category is : { category }")
+        listings = Listing.objects.filter(categories=category)
+        
+    except Listing.DoesNotExist:
+        listings = None
+
+    print(f"the listings for the category is : { listings }")
+    return render(request,'auctions/index.html',{
+        'listing': listings
+        })
 
 
 

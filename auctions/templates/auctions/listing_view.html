@@ -5,6 +5,15 @@
     {% if listing %}
         <h2>Listing: {{ listing.title }}</h2>
 
+        {% if request.user.is_authenticated %} 
+            {% if not watching %}
+                <a href="{% url 'watch' listing.id %}">Start Watching</a>
+            {% elif watching %}
+                <a href="{% url 'unwatch' listing.id %}">Stop Watching</a>
+            {% endif %}
+        {% endif %}
+
+        <br />
         <br />
 
         {% if message %}
