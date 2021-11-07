@@ -10,7 +10,7 @@ from .forms import AddListingForm, BidForm, CommentForm
 
 
 def index(request):
-    listing = Listing.objects.all()
+    listing = Listing.objects.filter(closed=False)
 
     return render(request, "auctions/index.html",{
         "listing": listing
@@ -156,7 +156,7 @@ def addListing(request):
     return HttpResponseRedirect(reverse("index"))
 
 
-def loadListingView(request, listing, bidForm, commentForm, message):
+def loadListingView(request, listing, bidForm, commentForm, message, highest_bid):
 
     if request.user and listing :
         watchList = WatchList.objects.filter(user=request.user,listing=listing)
@@ -164,6 +164,19 @@ def loadListingView(request, listing, bidForm, commentForm, message):
             isWatching = True
         else:
             isWatching = False
+
+        if not commentForm :
+            commentForm = CommentForm() 
+
+        if not bidForm :
+            bidForm = BidForm()
+
+        highest_bid = Bid.objects.filter(listing=listing,highest=True)
+        if highest_bid :
+            highest_bid = highest_bid.first()
+        else:
+            highest_bid = None
+
 
         commentForm.initial['list_id'] = listing.id
         bidForm.initial['list_id'] = listing.id
@@ -173,13 +186,12 @@ def loadListingView(request, listing, bidForm, commentForm, message):
         "bidForm": bidForm,
         "commentForm": commentForm,
         "message": message,
-        "watching": isWatching
+        "watching": isWatching,
+        "highest_bid": highest_bid
     })
     
 
 def listing_detail(request,list_id):
-    message = ""
-
     print(f"Search for a listing details with id {list_id}")
 
     try:
@@ -187,10 +199,7 @@ def listing_detail(request,list_id):
     except Listing.DoesNotExist:
         listing = None
 
-    commentForm = CommentForm()
-    bidForm = BidForm()
-
-    return loadListingView(request, listing, bidForm, commentForm, message)
+    return loadListingView(request, listing, None, None, "", None)
 
 
 def place_bid(request):
@@ -198,7 +207,6 @@ def place_bid(request):
     if request.method == 'POST':
         message = ""
         bidForm = BidForm(request.POST)
-        commentForm = CommentForm()
 
         list_id = request.POST["list_id"]
         listing = Listing.objects.get(id=list_id)
@@ -208,9 +216,15 @@ def place_bid(request):
             bid = request.POST["bid"]
             
             user = request.user
-            bid = Bid(bid=bid,listing=listing,user=user)
+            bid = Bid(bid=bid,listing=listing,user=user,highest=True)
 
             try:
+                highest_bid = Bid.objects.filter(listing__id=list_id,highest=True)
+                if highest_bid :
+                    prev_highest = highest_bid.first()
+                    prev_highest.highest = False
+                    prev_highest.save()
+
                 bid.save()
                 print(f"Bid: <{bid}> has been saved successfully")
                 message = "Your Bid has been successfully saved."
@@ -219,9 +233,11 @@ def place_bid(request):
                 print(f"An error occurred while saving your bid. Kindly try again. -> {bid}")
                 message = "An error occurred while saving your bid. Kindly try again."
         else:
-            print(f"**************The bid form is not valid")
+            bid = None
+            message = "Your bid is not valid"
+            print(f"The bid form is not valid")
 
-        return loadListingView(request, listing, bidForm, commentForm, message)
+        return loadListingView(request, listing, bidForm, None, message, bid)
     else:
         return HttpResponseRedirect(reverse("index"))
 
@@ -231,7 +247,7 @@ def add_comment(request):
     if request.method == 'POST':
         message = ""
         commentForm = CommentForm(request.POST)
-        bidForm = BidForm()
+        
 
         list_id = request.POST["list_id"]
         listing = Listing.objects.get(id=list_id)
@@ -252,9 +268,10 @@ def add_comment(request):
                 print(f"An error occurred while saving your comment. Kindly try again. -> {comment}")
                 message = "An error occurred while saving your comment. Kindly try again."
         else:
+            message = "The comment is not valid."
             print(f"**************The comment form is not valid")
     
-        return loadListingView(request, listing, bidForm, commentForm, message)
+        return loadListingView(request, listing, None, commentForm, message, None)
     else:
         return HttpResponseRedirect(reverse("index"))
 
@@ -276,13 +293,15 @@ def watch_item(request, list_id):
             watch = WatchList(user=request.user, listing=listing)
             watch.save()
             print("Auction item added to user watch list successfully.")
-            list_detail_message = "Auction item added to user watch list successfully."
+            message = "Auction item added to user watch list successfully."
         else:
+            message = "User is already watching this item"
             print("User is already watching this item")
     else:
+        message = f"No Auction item found with the provided list Id {list_id}" 
         print(f"No Auction item found with the provided list Id {list_id}" )
 
-    return listing_detail(request,list_id)
+    return loadListingView(request, listing, None, None, message, None)
 
 
 @login_required(login_url="login")
@@ -304,21 +323,23 @@ def unwatch_item(request,list_id):
         if watchItem :
             watchItem.delete()
             print("Auction item removed from user's watch list successfully.")
-            list_detail_message = "Auction item removed from user's watch list successfully."
+            message = "Auction item removed from user's watch list successfully."
         else:
+            message = "User is not watching item. Nothing to remove."
             print("User is not watching item. Nothing to remove.")
     else:
+        message = f"No Auction item found with the provided list Id {list_id}"
         print(f"No Auction item found with the provided list Id {list_id}" )
 
 
-    return listing_detail(request,list_id)
+    return loadListingView(request, listing, None, None, message, None)
 
 
 @login_required(login_url="login")
 def watchlist(request):
     print("Loading the watchlist for the logged in user.")
 
-    watchList = WatchList.objects.filter(user=request.user)
+    watchList = WatchList.objects.filter(user=request.user,listing__closed=False)
 
     return render(request, "auctions/watchlist.html", {
         "watchlist": watchList
@@ -343,20 +364,55 @@ def category_details(request, cat_id):
     try:
         category = Category.objects.get(id=cat_id)
         print(f"the category is : { category }")
-        listings = Listing.objects.filter(categories=category)
+        listings = Listing.objects.filter(categories=category, closed=False)
         
     except Listing.DoesNotExist:
         listings = None
 
     print(f"the listings for the category is : { listings }")
     return render(request,'auctions/index.html',{
-        'listing': listings
+        'listing': listings,
+        'category': category
         })
 
 
+@login_required(login_url="login")
+def close_auction(request, list_id):
+    print(f"User attempting to close auction item : {list_id}")
 
+    try:
+        listing = Listing.objects.get(id=list_id)
+    except Listing.DoesNotExist:
+        listing = None
 
+    if listing :
 
+        if request.user == listing.user :
+
+            if not listing.closed :
+                try:
+                    listing.closed = True
+                    listing.save()
+                    message = f"Listing {listing} has been closed successfully."
+                    print(f"Listing {listing} has been closed successfully.")
+                    watchList = WatchList.objects.filter(listing=listing)
+                    if watchList :
+                        watchList.delete()
+
+                except Exception:
+                    print(f"An error occurred while trying to close an auction. Kindly try again.")
+                    message = "An error occurred while trying to close an auction. Kindly try again."
+            else:
+                message = ""
+                print("The bid item is already closed. You cannot close it again.")
+        else:
+            message = f"You cannot close an auction item you did not create."
+            print(f"You cannot close an auction item you did not create.")
+    else:
+        message = f"No Auction item found with the provided list Id {list_id}"
+        print(f"No Auction item found with the provided list Id {list_id}" )
+
+    return loadListingView(request, listing, None, None, message, None)
 
 
 

@@ -25,6 +25,7 @@ class Listing(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='user')
     categories = models.ManyToManyField(Category, related_name='listings')
     closed = models.BooleanField(default=False)
+    
 
     
 

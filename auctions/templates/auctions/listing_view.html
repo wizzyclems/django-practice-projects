@@ -6,10 +6,31 @@
         <h2>Listing: {{ listing.title }}</h2>
 
         {% if request.user.is_authenticated %} 
-            {% if not watching %}
-                <a href="{% url 'watch' listing.id %}">Start Watching</a>
-            {% elif watching %}
-                <a href="{% url 'unwatch' listing.id %}">Stop Watching</a>
+            {% if not listing.closed %} 
+                {% if not request.user == listing.user %} 
+                    {% if not watching %}
+                        <a href="{% url 'watch' listing.id %}">Start Watching</a>
+                    {% elif watching %}
+                        <a href="{% url 'unwatch' listing.id %}">Stop Watching</a>
+                    {% endif %}
+                {% else %} 
+                        <a href="{% url 'close' listing.id %}">Close Auction</a>
+                {% endif %}
+            {% else %}
+                {% if not request.user == listing.user %} 
+                    <p>The Bidding has been closed.</p>
+                    {% if highest_bid and request.user == highest_bid.user %}
+                        <p style="color: green;">Yay, you won the bid!!!</p>
+                    {% endif %}
+                {% else %}
+                    <p>The Bidding is now closed.</p>
+                    {% if highest_bid  %}
+                        <p> 
+                            Name: {{ highest_bid.user }} <br >
+                            Bid: ${{ highest_bid.bid }} <br />
+                        </p>
+                    {% endif %}
+                {% endif %}
             {% endif %}
         {% endif %}
 
@@ -19,10 +40,10 @@
         {% if message %}
             <div>{{ message }}</div>
         {% endif %}
-        {% for error in bidForm.errors %}
+        {% for error in bidForm.non_field_errors %}
             <p style="color:red;">{{ error }}</p>
         {% endfor %}
-        {% for error in commentForm.errors %}
+        {% for error in commentForm.comment.errors %}
             <p style="color:red;">{{ error }}</p>
         {% endfor %}
 
@@ -38,7 +59,7 @@
         </div>
         <br />
         <!-- The below lines of codes allows the user to place a bid if they have logged into the portal. -->
-        {% if request.user.is_authenticated %}
+        {% if request.user.is_authenticated and not listing.closed and request.user != listing.user %}
 
             <div>
                 <p>{{ listing.biddings.count }} bid(s) so far. Your bid is the current bid.</p>
@@ -76,7 +97,7 @@
                 <h6>Comments</h6>
                 
                 <!-- The below line allows the user to comment on a listing item only if they are logged in -->
-                {% if request.user.is_authenticated %}
+                {% if request.user.is_authenticated and not listing.closed and request.user != listing.user  %}
                     <div>
                         <form action="{% url 'add_comment' %}" method="post" >
                             {% csrf_token %}

@@ -20,7 +20,8 @@ urlpatterns = [
     path("listings/unwatch/<int:list_id>", views.unwatch_item, name="unwatch"),
     path("listings/watchlist", views.watchlist, name="watchlist"),
     path("listings/categories", views.categories, name="categories"),
-    path("listings/categories/<int:cat_id>", views.category_details, name="category_details")
+    path("listings/categories/<int:cat_id>", views.category_details, name="category_details"),
+    path("listings/close/<int:list_id>", views.close_auction, name="close")
 
 ]
 
