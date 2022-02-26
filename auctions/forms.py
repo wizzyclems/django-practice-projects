@@ -4,25 +4,30 @@ from auctions.models import Category,Bid, Listing
 
 
 class AddListingForm(forms.Form):
-    title = forms.CharField(min_length=3, widget=forms.TextInput)
-    description = forms.CharField(widget=forms.Textarea(attrs={'cols':10,'rows':3}))
-    startBid = forms.CharField(widget=forms.NumberInput())
-    categories = Category.objects.all()
+    
+    title = forms.CharField(min_length=3, widget=forms.TextInput(attrs={'class':'form-control'}))
+    description = forms.CharField(widget=forms.Textarea(attrs={'cols':10,'rows':3,'class':'form-control'}))
+    startBid = forms.CharField(widget=forms.NumberInput(attrs={'class':'form-control'}))
+    
+    #We load all categories excluding the "No category Listed"
+    categories = categories = Category.objects.exclude(title="No Category Listed")
     category = forms.ModelMultipleChoiceField(queryset=categories)
+    category.required = False
+    category.widget.attrs.update({'class':'form-control'})
     photo = forms.ImageField()
+    photo.widget.attrs.update({'class':'form-control'})
+    photo.required = False
 
 
 class BidForm(forms.Form):
-    bid = forms.CharField(widget=forms.NumberInput())
+    bid = forms.CharField(widget=forms.NumberInput(attrs={'class':'form-control','placeholder':'Bid'}))
     list_id = forms.CharField(widget=forms.HiddenInput())
 
     def clean(self):
         #cleaned_data = super().clean()
         bid = self.cleaned_data.get('bid')
         list_id = self.cleaned_data.get('list_id')
-        print(f"**********clean data {self.cleaned_data}")
-        print(f"*****The bid is {bid}")
-        print(f"******The list item for bid is {list_id}")
+        
 
         try:
             list = Listing.objects.get(id=list_id)
@@ -34,7 +39,7 @@ class BidForm(forms.Form):
         if highest_bid :
             print(f"highest bid : {highest_bid} is valid")
             if not int(bid) > highest_bid.first().bid:
-                msg = 'Your bid must be higher than the current price.'
+                msg = 'Your bid must be greater than the highest bid.'
                 raise forms.ValidationError(msg)
         else:
             print(f"No highest bid")
@@ -52,8 +57,8 @@ class BidForm(forms.Form):
 
 
 class CommentForm(forms.Form):
-    text = forms.CharField(widget=forms.Textarea(attrs={'cols':10,'rows':2}))
-
+    text = forms.CharField(widget=forms.Textarea(attrs={'cols':'10','rows':'2','class':'form-control','placeholder':'Type comment here'}))
+    
     list_id = forms.CharField(widget = forms.HiddenInput(), required = False)
 
     def clean_text(self):

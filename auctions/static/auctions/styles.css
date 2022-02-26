@@ -1,3 +1,16 @@
 body {
     padding: 10px;
 }
+
+
+.listing-row {
+    border: 1px rgb(140, 190, 231) solid;
+    background-color:rgb(247, 247, 247);
+    margin-bottom: 10px;
+}
+
+
+.details-borders{
+    margin: 10px 10px 10px 20px;
+    background-color: blueviolet;
+}

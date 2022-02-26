@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, redirect
@@ -94,28 +95,16 @@ def addListing(request):
             description = listingForm.cleaned_data["description"]
             startBid = listingForm.cleaned_data["startBid"]
             categories = listingForm.cleaned_data["category"]
-            #categories = [c for c in categories]
-            #print(categories)
+            
             photo = listingForm.cleaned_data["photo"]
 
             #TODO
             #1. adjust the dimensions of the uploaded image
             #2. change the name of the uploaded image to ensure uniqueness
-            print(photo.image)
-            print(photo.image.width)
-            print(photo.image.height)
-            print(photo.image.format)
             
-            #print(f"{title}:{description}:{startBid}:{categories}:{photo}") 
             user = request.user
             
-            #TODO - save the form
-            
             try:
-                
-                #listing = Listing(args={"title":title,"description":description,
-                #"startBid":startBid,"photo":None,"user":user,"categories":categories})
-                
                 listing = Listing()
                 listing.title = title
                 listing.description = description
@@ -125,28 +114,33 @@ def addListing(request):
 
                 listing.save()
 
+                if not categories :
+                    print(f"No category was selected...{categories}")
+                    categories = getBlankCategorySet()
+                
+                print(f"Category to persist is...{categories}")
                 listing.categories.set(categories)
+                
                 
             except IntegrityError:
                 return render(request, "auctions/add_listing.html", {
                     "message": "Similar Listing already exist.",
                     "addListingForm": listingForm
                 })
-            except Exception:
+            except Exception as e:
+                print(e)
                 return render(request, "auctions/add_listing.html", {
                     "message": "An error occurred while adding listing. Ensure your form is correctly filled.",
                     "addListingForm": listingForm
                 })
 
         else:
-            print("*** The form is not valid")
             
             return render(request, "auctions/add_listing.html", {
                 "addListingForm": listingForm
             })
         
     else:
-        print("*** user will be redirected the the main listing page.")
         listingForm = AddListingForm()
         return render(request, "auctions/add_listing.html", {
             "addListingForm": listingForm
@@ -158,7 +152,10 @@ def addListing(request):
 
 def loadListingView(request, listing, bidForm, commentForm, message, highest_bid):
 
-    if request.user and listing :
+    isWatching = False
+    
+    if request.user and request.user.is_authenticated and listing :
+        print(f"Valid user currently logged in... {request.user}")
         watchList = WatchList.objects.filter(user=request.user,listing=listing)
         if watchList:
             isWatching = True
@@ -180,6 +177,21 @@ def loadListingView(request, listing, bidForm, commentForm, message, highest_bid
 
         commentForm.initial['list_id'] = listing.id
         bidForm.initial['list_id'] = listing.id
+    else:
+        print(f"No valid user currently logged in... {request.user}")
+
+    categories = listing.categories.all()
+    print(f"The chosen list category is : {categories}")
+    if categories :
+        cat = []
+        for c in categories :
+            cat.append(c.title)
+
+        categories = ",".join(cat)
+        print(categories)
+    else:
+        print("Categoreis is empty...")
+        categories = "No Category"
 
     return render(request, "auctions/listing_view.html",{
         "listing": listing,
@@ -187,7 +199,8 @@ def loadListingView(request, listing, bidForm, commentForm, message, highest_bid
         "commentForm": commentForm,
         "message": message,
         "watching": isWatching,
-        "highest_bid": highest_bid
+        "highest_bid": highest_bid,
+        "categories": categories
     })
     
 
@@ -350,10 +363,11 @@ def categories(request):
     print("Loading the available categories.")
 
     categories = Category.objects.all()
-
+    
     return render(request, "auctions/categories.html", {
         "categories": categories
     })
+ 
 
 
 def category_details(request, cat_id):
@@ -363,13 +377,12 @@ def category_details(request, cat_id):
 
     try:
         category = Category.objects.get(id=cat_id)
-        print(f"the category is : { category }")
         listings = Listing.objects.filter(categories=category, closed=False)
         
     except Listing.DoesNotExist:
         listings = None
 
-    print(f"the listings for the category is : { listings }")
+    
     return render(request,'auctions/index.html',{
         'listing': listings,
         'category': category
@@ -416,8 +429,22 @@ def close_auction(request, list_id):
 
 
 
+def getBlankCategory():
+    try:
+        category = Category.objects.get(title='No Category Listed')
+        print(f'Category returned...{category}')
+    except Category.DoesNotExist:
+        category = Category(title='No Category Listed')
+        category.save()
+        print(f'Category successfully created...{category}')
 
+    return category
 
+def getBlankCategorySet():
+    
+    category = getBlankCategory()
+    print(f'adding the category to a set...{category}')
+    return set([category])
 
 
 

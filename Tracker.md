@@ -8,6 +8,8 @@
 
 
 ####In Progress
+
+####Done
 - display auction listings based on selected category
 - bid should only be added if the bid is greater or equal than the starting value and greater than highest bid
 - only auctions that are not closed should be displayed
